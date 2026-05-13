@@ -177,6 +177,34 @@ void save_frame(const std::vector<Polygon>& cells, std::string filename, int fra
 }
 
 
+// saves a static svg file. The polygon vertices are supposed to be in the range [0..1], and a canvas of size 1000x1000 is created
+void save_svg(const std::vector<Polygon>& polygons, std::string filename, const std::vector<Vector>* points = NULL, std::string fillcol = "none") {
+    FILE* f = fopen(filename.c_str(), "w+");
+    fprintf(f, "<svg xmlns = \"http://www.w3.org/2000/svg\" width = \"1000\" height = \"1000\">\n");
+    for (int i = 0; i < polygons.size(); i++) {
+        fprintf(f, "<g>\n");
+        fprintf(f, "<polygon points = \"");
+        for (int j = 0; j < polygons[i].vertices.size(); j++) {
+            fprintf(f, "%3.3f, %3.3f ", (polygons[i].vertices[j][0] * 1000), (1000 - polygons[i].vertices[j][1] * 1000));
+        }
+        fprintf(f, "\"\nfill = \"%s\" stroke = \"black\"/>\n", fillcol.c_str());
+        fprintf(f, "</g>\n");
+    }
+
+    if (points) {
+        fprintf(f, "<g>\n");
+        for (int i = 0; i < points->size(); i++) {
+            fprintf(f, "<circle cx = \"%3.3f\" cy = \"%3.3f\" r = \"3\" />\n", (*points)[i][0] * 1000., 1000. - (*points)[i][1] * 1000);
+        }
+        fprintf(f, "</g>\n");
+
+    }
+
+    fprintf(f, "</svg>\n");
+    fclose(f);
+}
+
+
 class VoronoiDiagram {
 
 public:
@@ -336,22 +364,6 @@ public:
     double fluid_volume; // you decide the fraction of the unit square occupied by the fluid
 };
 
-// saves a static svg file. The polygon vertices are supposed to be in the range [0..1], and a canvas of size 1000x1000 is created
-void save_svg(const std::vector<Polygon>& polygons, std::string filename, std::string fillcol = "none") {
-    FILE* f = fopen(filename.c_str(), "w+");
-    fprintf(f, "<svg xmlns = \"http://www.w3.org/2000/svg\" width = \"1000\" height = \"1000\">\n");
-    for (int i = 0; i < polygons.size(); i++) {
-        fprintf(f, "<g>\n");
-        fprintf(f, "<polygon points = \"");
-        for (int j = 0; j < polygons[i].vertices.size(); j++) {
-            fprintf(f, "%3.3f, %3.3f ", (polygons[i].vertices[j][0] * 1000), (1000 - polygons[i].vertices[j][1] * 1000));
-        }
-        fprintf(f, "\"\nfill = \"%s\" stroke = \"black\"/>\n", fillcol.c_str());
-        fprintf(f, "</g>\n");
-    }
-    fprintf(f, "</svg>\n");
-    fclose(f);
-}
 
 
 
