@@ -207,7 +207,7 @@ public:
         return result;
     }
 
-    static Polygon clip_by_bisector(const Polygon& V, const Vector& Pi, const Vector& Pj, double w0, double wi) {
+    static Polygon clip_by_bisector(const Polygon& V, const Vector& P0, const Vector& Pi, double w0, double wi) {
 
         // TODO Lab 1 (Voronoi) : in Lab 1, we assume w0 = w1 = 0
         // Clip a polygon by the bisector of the segment defined by P0 (the current site of the Voronoi cell being computed) and Pi (another site)
