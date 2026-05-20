@@ -61,7 +61,14 @@ public:
         if (vertices.size() < 3) return 0;
         // TODO Lab 3
         // Compute the area of the polygon
-        return -111;
+        //take vertex 0 as the first vertex, and create triangles with the other vertices
+        double sum = 0.0;
+        size_t N = vertices.size()-1;
+        for(size_t i=0; i<N;++i){
+            sum += (vertices[i][0]*vertices[(i+1)%N][1] - vertices[(i+1)%N][0]*vertices[i][1]);
+        }
+        double A = std::abs(sum)/2.0;
+        return A;
     }
 
     Vector centroid() {
@@ -78,7 +85,25 @@ public:
         // TODO Lab 3
         // Compute the integral of ||x-Pi||^2 over the polygon
 
-        return -111;
+        size_t N = vertices.size();
+        double result = 0.0;
+        for(size_t i=1; i<N-1;++i){
+            Vector c[3] = {vertices[0], vertices[i], vertices[i+1]};
+
+            double temp1 = (c[1][0] - c[0][0])*(c[2][1] - c[0][1]);
+            double temp2 = (c[2][0] - c[0][0])*(c[1][1] - c[0][1]);
+            double triangle_area = 0.5*std::abs(temp1 - temp2);
+            
+            
+            double sum = 0.0;
+            for(size_t k=0; k<3; ++k){
+                for(size_t l=k; l<3; ++l){
+                    sum += dot(c[k] - Pi, c[l] - Pi);
+                }
+            }
+            result += triangle_area/6.0*sum;
+        }
+        return result;
     }
 
     std::vector<Vector> vertices;
@@ -285,28 +310,29 @@ public:
 
             if (Bin) {
                 if (!Ain) {
-                    // A outside → B inside: compute and add crossing point
+                    // A outside and B inside: compute and add crossing point
                     Vector M   = (P0 + Pi) * 0.5;
+                    Vector M_prime = M + (Pi - P0)*(w0-wi)/(2.0*(P0-Pi).norm2());
                     Vector dir = Pi - P0;
                     double denom = dot(B - A, dir);
                     if (std::abs(denom) > 1e-15) {
-                        double t = dot(M - A, dir) / denom;
+                        double t = dot(M_prime - A, dir) / denom;
                         result.vertices.push_back(A + (B - A) * t);
                     }
                 }
                 result.vertices.push_back(B);   // B always added when inside
             } else {
                 if (Ain) {
-                    // A inside → B outside: compute and add crossing point only
                     Vector M   = (P0 + Pi) * 0.5;
+                    Vector M_prime = M + (Pi - P0)*(w0-wi)/(2.0*(P0-Pi).norm2());
                     Vector dir = Pi - P0;
                     double denom = dot(B - A, dir);
                     if (std::abs(denom) > 1e-15) {
-                        double t = dot(M - A, dir) / denom;
+                        double t = dot(M_prime - A, dir) / denom;
                         result.vertices.push_back(A + (B - A) * t);
                     }
                 }
-                
+
                 // both outside: add nothing
             }
         }
@@ -355,10 +381,17 @@ static lbfgsfloatval_t evaluate(
    
     // Lab 2 (Optimal transport) : compute the function to be minimized (fx) and its gradient (g[i], i=0..n-1)
     // Lab 3 (fluid) : adapt these functions to support partial optimal transport (now "n" has been increased by 1 to account for the air variable)
-    
+    double lambda = 1.0/n;
     lbfgsfloatval_t fx = 0.0;
-    // g[i] = ...
-    // fx = ...
+    for(size_t i=0; i<n; ++i){
+        Polygon& cell = ot->vor.cells[i];
+        Vector vec = ot->vor.points[i];
+        std::cout << " square distance " << cell.integral_square_distance(vec) << "\n";
+
+        double cellarea = cell.area();
+        g[i] =  cellarea - lambda;
+        fx += -(cell.integral_square_distance(vec) -x[i]*cellarea + x[i]*lambda);
+    }
 
     return fx;
 }
@@ -388,6 +421,8 @@ void OptimalTransport::optimize() {
 
     // run the LBFGS optimizer
     int ret = lbfgs(weights.size(), &weights[0], &fx, evaluate, progress, (void*)this, &param);
+
+    std::cout << "output: " << ret << "\n";
 
     // copy the result back to the voronoi structure
     vor.weights = weights;
@@ -441,34 +476,36 @@ public:
 
 int main() {
 
-    Polygon p;
-    p.vertices.push_back(Vector(0.1, 0.2));
-    p.vertices.push_back(Vector(0.6, 0.4));
-    p.vertices.push_back(Vector(0.5, 0.7));
-    p.vertices.push_back(Vector(0.2, 0.5));
+    // Polygon p;
+    // p.vertices.push_back(Vector(0.1, 0.2));
+    // p.vertices.push_back(Vector(0.6, 0.4));
+    // p.vertices.push_back(Vector(0.5, 0.7));
+    // p.vertices.push_back(Vector(0.2, 0.5));
 
-    std::vector<Polygon> s;
-    s.push_back(p);
+    // std::vector<Polygon> s;
+    // s.push_back(p);
 
-    save_frame(s, "toto");
-    save_svg(s, "toto.svg");
+    // save_frame(s, "toto");
+    // save_svg(s, "toto.svg");
 
 
 
-    const int N = 2000;
+    const int N = 50;
     srand(42);
-    VoronoiDiagram vor;
-    vor.points.resize(N);
-    for (int i = 0; i < N; ++i)
-        vor.points[i] = Vector(
-            (double)rand() / RAND_MAX,
-            (double)rand() / RAND_MAX
-        );
+    OptimalTransport ot;
+    ot.vor.points.resize(4);
+    ot.vor.weights.resize(4, 1.0);
+    ot.vor.points = {Vector(0., 0.), Vector(0., 1.), Vector(1., 1.), Vector(1., 0.)};
+    // for (int i = 0; i < N; ++i)
+    //     ot.vor.points[i] = Vector(
+    //         (double)rand() / RAND_MAX,
+    //         (double)rand() / RAND_MAX
+    //     );
 
-    vor.compute();
+    ot.optimize();
 
-    save_svg(vor.cells, "voronoi.svg", &vor.points);
-    save_frame(vor.cells, "voronoi");
+    save_svg(ot.vor.cells, "test1_optimal.svg", &ot.vor.points);
+    save_frame(ot.vor.cells, "test1");
 
     return 0;
 }
