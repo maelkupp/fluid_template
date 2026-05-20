@@ -221,7 +221,33 @@ public:
         //      For all other sites Pj (optionally, only k nearest neighbors) :
         //          Clip it with bisector of [Pi,Pj]
         //      (Lab 3, fluids) : also clip it by a disk of radius sqrt(w_i - w_air) centered at Pi
+
+        int N = static_cast<int>(points.size());
+        cells.resize(N);
+        if (static_cast<int>(weights.size()) != N) weights.assign(N, 0.0);
+
+        #pragma omp parallel for schedule(dynamic)
+            for (int i = 0; i < N; ++i) {
+                // Every cell starts as the full unit square
+                Polygon cell;
+                cell.vertices = {
+                    Vector(0.0, 0.0),
+                    Vector(1.0, 0.0),
+                    Vector(1.0, 1.0),
+                    Vector(0.0, 1.0)
+                };
+
+                // Clip it against every other site's bisector
+                for (int j = 0; j < N; ++j) {
+                    if (j == i) continue;
+                    cell = clip_by_bisector(cell, points[i], points[j],
+                                            weights[i], weights[j]);
+                    if (cell.vertices.empty()) break;
+                }
+                cells[i] = cell;
+            }
     }
+    
 
 
     static Polygon clip_by_edge(const Polygon& V, const Vector& u, const Vector& v) {
@@ -243,8 +269,48 @@ public:
         // TODO Lab 2 (Semi-Discrete Optimal Transport) : extend to Laguerre cells, i.e., w0 != w1
 
         Polygon result;
+        int n = static_cast<int>(V.vertices.size());
+        if (n == 0) return result;
 
+        for (int i = 0; i < n; ++i) {
+            const Vector& A = V.vertices[(i == 0) ? n-1 : i-1];
+            const Vector& B = V.vertices[i];
+
+            auto inside = [&](const Vector& X) -> bool {
+                return (X - P0).norm2() - w0 <= (X - Pi).norm2() - wi;
+            };
+
+            bool Ain = inside(A);
+            bool Bin = inside(B);
+
+            if (Bin) {
+                if (!Ain) {
+                    // A outside → B inside: compute and add crossing point
+                    Vector M   = (P0 + Pi) * 0.5;
+                    Vector dir = Pi - P0;
+                    double denom = dot(B - A, dir);
+                    if (std::abs(denom) > 1e-15) {
+                        double t = dot(M - A, dir) / denom;
+                        result.vertices.push_back(A + (B - A) * t);
+                    }
+                }
+                result.vertices.push_back(B);   // B always added when inside
+            } else {
+                if (Ain) {
+                    // A inside → B outside: compute and add crossing point only
+                    Vector M   = (P0 + Pi) * 0.5;
+                    Vector dir = Pi - P0;
+                    double denom = dot(B - A, dir);
+                    if (std::abs(denom) > 1e-15) {
+                        double t = dot(M - A, dir) / denom;
+                        result.vertices.push_back(A + (B - A) * t);
+                    }
+                }
+                // both outside: add nothing
+            }
+        }
         return result;
+
     }
 
 
@@ -254,7 +320,7 @@ public:
     
     std::vector<Polygon> cells;   // Lab 1 : the polygons representing each individual cell
 
-    
+
 };
 
 
@@ -385,5 +451,23 @@ int main() {
 
     save_frame(s, "toto");
     save_svg(s, "toto.svg");
+
+
+
+    const int N = 2000;
+    srand(42);
+    VoronoiDiagram vor;
+    vor.points.resize(N);
+    for (int i = 0; i < N; ++i)
+        vor.points[i] = Vector(
+            (double)rand() / RAND_MAX,
+            (double)rand() / RAND_MAX
+        );
+
+    vor.compute();
+
+    save_svg(vor.cells, "voronoi.svg", &vor.points);
+    save_frame(vor.cells, "voronoi");
+
     return 0;
 }
