@@ -306,6 +306,7 @@ public:
                         result.vertices.push_back(A + (B - A) * t);
                     }
                 }
+                
                 // both outside: add nothing
             }
         }
