@@ -465,6 +465,7 @@ public:
     std::vector<Vector> particles;  // the position of all particles
     std::vector<Vector> velocities; // the velocities of all particles
     double fluid_volume; // you decide the fraction of the unit square occupied by the fluid
+    
 };
 
 
